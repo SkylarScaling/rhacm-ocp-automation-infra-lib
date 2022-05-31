@@ -1,5 +1,5 @@
 # Introduction
-This repository contains re-usable scripts and templates to deploy OpenShift, RHACM, and related infrastructure.
+This repository contains re-usable playbooks and templates to deploy OpenShift, RHACM, and related infrastructure using Ansible automation.
 
 # Getting Started
 
