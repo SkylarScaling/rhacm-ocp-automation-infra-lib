@@ -8,12 +8,12 @@ To work with this repository locally you will need clone it using https or ssh a
 
 For https:
 ```
-git clone <TODO>
+git clone https://github.com/SkylarScaling/rhacm-ocp-automation-infra-lib.git
 ```
 
 For ssh:
 ```
-git clone <TODO>
+git clone git@github.com:SkylarScaling/rhacm-ocp-automation-infra-lib.git
 ```
 
 ## Assertions and Assumptions
