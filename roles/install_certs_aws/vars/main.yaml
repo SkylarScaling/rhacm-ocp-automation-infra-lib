@@ -1,0 +1,9 @@
+---
+certs:
+  apps_certificate_name: "{{ ocp_cluster.env }}-apps-lets-encrypt"
+  apps_certificate_secret_name: "{{ ocp_cluster.env }}-apps-lets-encrypt-secret"
+  api_certificate_name: "{{ ocp_cluster.env }}-api-lets-encrypt"
+  api_certificate_secret_name: "{{ ocp_cluster.env }}-api-lets-encrypt-secret"
+  org_name: "Red Hat"
+  ocp_cluster_route: "{{ ocp_cluster.name }}.{{ install_config.base_domain }}"
+...

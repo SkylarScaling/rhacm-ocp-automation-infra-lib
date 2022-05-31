@@ -1,0 +1,48 @@
+---
+
+- name: create manifests output dir if it does not exist
+  ansible.builtin.file:
+    state: directory
+    path: "{{ output_path }}"
+
+
+- name: "copy loki-build-secret file into manifests_output_dir for the cluster"
+  ansible.builtin.template: 
+    src: "loki-build-secret.yaml.j2"
+    dest: "{{ output_path }}/loki-build-secret.yaml"
+
+
+- name: "Configure cluster kustomization file for {{ cluster_name }}"
+  copy:
+    src: "../files/kustomization.yaml"
+    dest: "{{ output_path }}/kustomization.yaml"
+    force: no
+
+- name: "Update Kustomization"
+  lineinfile:
+    insertafter: "resources:"
+    state: "{{ state }}"
+    dest: "{{ output_path }}/kustomization.yaml" 
+    line: "- loki-build-secret.yaml"
+
+- name: "Add additional manifests to kustomization"
+  lineinfile:
+    insertafter: "bases:"
+    state: "{{ state }}"
+    dest: "{{ output_path }}/kustomization.yaml"
+    line: "- ../../../manifests/loki"
+
+
+- name: "create top level kustomization file for {{ cluster_name }} if does not exists"
+  copy:
+    src: "../files/kustomization.yaml"
+    dest: "{{ manifests_output_path }}/kustomization.yaml"
+    force: no
+
+- name: "Update top level Kustomization file"
+  lineinfile:
+    insertafter: "resources:"
+    state: "{{ state }}"
+    dest: "{{ manifests_output_path }}/kustomization.yaml" 
+    line: "- ./loki"
+

@@ -1,0 +1,98 @@
+---
+- name: Configure GitOps
+  block:
+    - debug:
+        msg: "Installling Redhat Gitops"
+
+    - include_vars: "../../../../ocp-gitops-infra-config/clusters/{{ cluster_name }}/auth/kubeadmin-password"
+
+    - name: Login to cluster (obtain access token)
+      community.kubernetes.k8s_auth:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        username: kubeadmin
+        password: "{{ kubeadmin_pass }}"
+      register: k8s_auth_results
+
+    - name: "{{ 'Install' if state == 'present' else 'Remove' }} GitOps Operator"
+      k8s:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        state: "{{ state }}"
+        definition:
+          apiVersion: operators.coreos.com/v1alpha1
+          kind: Subscription
+          metadata:
+            name: openshift-gitops-operator
+            namespace: openshift-operators
+          labels:
+            operators.coreos.com/openshift-gitops-operator.openshift-operators: ''
+          spec:
+            sourceNamespace: openshift-marketplace
+            source: redhat-operators
+            channel: stable
+            installPlanApproval: Manual
+            name: openshift-gitops-operator
+            startingCSV: openshift-gitops-operator.v1.1.2
+
+    - name: Wait for openshift-gitops namespace to be present
+      k8s_info:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        kind: Namespace
+        api_version: v1
+        name: "openshift-gitops"
+      register: output_info
+      until: (output_info.resources | json_query('[0].status.phase')) == 'Active'
+      delay: 2
+      retries: 20
+
+    - name: Configure Creds from vault
+      set_fact:
+        gitops_username: "{{ gitops.infra_config_username }}"
+        gitops_password: "{{ gitops.infra_config_password  }}"
+
+    - name: "{{ 'Install' if state == 'present' else 'Remove' }} Git Secret"
+      k8s:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        state: "{{ state }}"
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: "ocp-gitops-infra-git"
+            namespace: openshift-gitops
+          data:
+            username: "{{ gitops_username }}"
+            password: "{{ gitops_password }}"
+          type: Opaque
+
+    - name: copy git repo config template
+      ansible.builtin.template:
+        src: "git-repo.yaml.j2"
+        dest: "{{ working_dir }}/git-repo.yaml"
+
+    - name: Apply Git Configuration
+      k8s:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        src: "{{ working_dir }}/git-repo.yaml"
+        state: "{{ state }}"
+        namespace: openshift-gitops
+        api_version: v1
+      no_log: true
+      when: state == 'present'
+
+  always:
+    - name: If login succeeded, try to log out (revoke access token)
+      when: k8s_auth_results.k8s_auth.api_key is defined
+      community.kubernetes.k8s_auth:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        state: absent
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"

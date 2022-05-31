@@ -1,0 +1,46 @@
+---
+- name: Get cluster ID
+  include_role:
+    name: get_managed_cluster_id
+
+- ec2_vpc_net_info:
+    aws_access_key: "{{ aws.aws_access_key_id }}"
+    aws_secret_key: "{{ aws.aws_secret_access_key }}"
+    region: "{{ aws_region }}"
+    filters:
+      "tag:Name": "{{ cluster_id }}-vpc"
+  register: vpc_info
+
+- set_fact:
+    vpc_id: "{{ vpc_info.vpcs[0].id }}"
+
+- name: Add EFA-enabled Security Group
+  ec2_group:
+    aws_access_key: "{{ aws.aws_access_key_id }}"
+    aws_secret_key: "{{ aws.aws_secret_access_key }}"
+    name: "EFA group for {{ vpc_id }}"
+    description: "EFA security group"
+    vpc_id: "{{ vpc_id }}"
+    region: "{{ aws_region }}"
+  register: group_create
+
+- set_fact:
+    sg_id: "{{ group_create.group_id }}"
+
+- name: Add EFA-enabled Security Group
+  ec2_group:
+    aws_access_key: "{{ aws.aws_access_key_id }}"
+    aws_secret_key: "{{ aws.aws_secret_access_key }}"
+    name: "EFA group for {{ vpc_id }}"
+    description: "EFA security group"
+    vpc_id: "{{ vpc_id }}"
+    region: "{{ aws_region }}"
+    rules:
+      - proto: all
+        group_id: "{{ sg_id }}"
+        rule_desc: inbound all traffic
+
+    rules_egress:
+      - proto: all
+        group_id: "{{ sg_id }}"
+        rule_desc: outbound all traffic

@@ -1,0 +1,9 @@
+---
+    - name: Generate Registry Setting
+      include_role:
+        name: configure_registry
+      vars:
+        manifests_output_path: "../../ocp-gitops-infra-config/clusters/{{ cluster_name }}"
+        image_registry: "{{ registry }}"
+      when:
+        - registry is defined 

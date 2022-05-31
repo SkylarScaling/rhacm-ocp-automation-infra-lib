@@ -1,0 +1,143 @@
+---
+- name: Configure Gitops for a Managed Cluster
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    infra_cluster_configs: "../../ocp-gitops-infra-config/clusters"
+    manifests_output_path: "{{ infra_cluster_configs }}/{{ cluster_name }}"
+  vars_files:
+    - "../../ocp-infra-deploy/{{ cluster_name }}/infra_vars.yaml"
+  tasks:
+  - block:
+    - include_vars: "{{ infra_cluster_configs }}/{{ hub_cluster_name }}/auth/kubeadmin-password"
+
+    - name: Login to cluster (obtain access token)
+      community.kubernetes.k8s_auth:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        username: kubeadmin
+        password: "{{ kubeadmin_pass }}"
+      register: k8s_auth_results
+
+    - name: create manifests output dir
+      ansible.builtin.file:
+        state: directory
+        path: "{{ manifests_output_path }}"
+      register: manifests_output_dir
+
+    - name: Configure kustomization file for "{{ cluster_name }}"
+      copy:
+        src: "../files/kustomization.yaml"
+        dest: "{{ manifests_output_dir.path }}/kustomization.yaml"
+
+    - name: "Add environments to kustomization"
+      lineinfile:
+        insertafter: "bases:"
+        state: "{{ state }}"
+        dest: "{{ manifests_output_dir.path }}/kustomization.yaml"
+        line: "- ../../environments/{{ item }}"
+      loop: "{{ environments }}"
+      when:
+      - environments is defined
+
+    - name: "Add additional manifests to kustomization"
+      lineinfile:
+        insertafter: "bases:"
+        state: "{{ state }}"
+        dest: "{{ manifests_output_dir.path }}/kustomization.yaml"
+        line: "- ../../manifests/{{ item }}"
+      loop: "{{ additional_manifests }}"
+      when:
+      - additional_manifests is defined
+
+    - name: process machine sets
+      include_tasks: create-machinesets.yaml
+      vars:
+        ms_definition: "{{ ms_def }}"
+      loop: "{{ machinesets }}"
+      loop_control:
+        loop_var: ms_def
+      when:
+      - machinesets is defined
+
+    - name: get worker machinesets
+      include_role:
+        name: extract_worker_machinesets
+      when:
+      - installed_workers is defined and installed_workers.additional_labels is defined
+
+    - name: process registry settings
+      include_tasks: image-registry.yaml
+      when:
+      - registry is defined
+
+    - name: enable  machine autoscaling
+      include_role:
+        name: configure_machine_autoscale
+      vars:
+        autoscale_config: "{{ machine_autoscale }}"
+      when:
+      - machine_autoscale is defined and machine_autoscale.enabled == 'true'
+
+    - name: create operator manifests output dir
+      ansible.builtin.file:
+        state: directory
+        path: "{{ manifests_output_path }}/operators"
+      register: operator_manifests_output_dir
+
+    - name: Configure operator kustomization file for "{{ cluster_name }}"
+      copy:
+        src: "../files/kustomization.yaml"
+        dest: "{{ operator_manifests_output_dir.path }}/kustomization.yaml"
+
+    - name: "Add operators to kustomization"
+      lineinfile:
+        insertafter: "bases:"
+        state: "{{ state }}"
+        dest: "{{ operator_manifests_output_dir.path }}/kustomization.yaml"
+        line: "- ../../../manifests/{{ item }}"
+      loop: "{{ operators }}"
+      when:
+        - operators is defined
+
+    - name: Configure observability stack
+      block:
+        - set_fact:
+            output_path: "{{ manifests_output_path }}/loki"
+
+        - name: Configure loki
+          include_role:
+            name: configure_loki
+
+        - set_fact:
+            output_path: "{{ manifests_output_path }}/fluentd"
+
+        - name: Configure fluentd
+          include_role:
+            name: configure_fluentd
+
+        - set_fact:
+            output_path: "{{ manifests_output_path }}/federated-prometheus"
+
+        - name: Configure fed prometheus
+          include_role:
+            name: configure_fed_prometheus
+
+        - set_fact:
+            output_path: "{{ manifests_output_path }}/grafana-resource"
+
+        - name: Configure grafana resource
+          include_role:
+            name: configure_grafana_resource
+      when: observability is defined
+
+    always:
+      - name: If login succeeded, try to log out (revoke access token)
+        when: k8s_auth_results.k8s_auth.api_key is defined
+        community.kubernetes.k8s_auth:
+          host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+          validate_certs: no
+          state: absent
+          api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+

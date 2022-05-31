@@ -1,0 +1,43 @@
+apiVersion: config.openshift.io/v1
+kind: Image
+metadata:
+  annotations:
+    release.openshift.io/create-only: 'true'
+  name: cluster
+spec: 
+  allowedRegistriesForImport: 
+{% if image_registry.secure_registries is defined %}
+{% for entry in image_registry.secure_registries %}
+    - domainName: {{ entry }}
+      insecure: false
+{% endfor %}
+{% endif %}
+{% if image_registry.insecure_registries is defined %}
+{% for entry in image_registry.insecure_registries %}
+    - domainName: {{ entry }}
+      insecure: true
+{% endfor %}
+{% endif %}
+{% if image_registry.additional_ca.name is defined %}
+  additionalTrustedCA: 
+    name: {{ image_registry.additional_ca.name }}
+{% endif %}
+  registrySources:
+{% if image_registry.secure_registries is defined %}
+    allowedRegistries:
+{% for entry in image_registry.secure_registries %}
+    - {{ entry }}
+{% endfor %}
+{% endif %}
+    insecureRegistries:
+{% if image_registry.insecure_registries is defined %}
+{% for entry in image_registry.insecure_registries %}
+    - {{ entry }}
+{% endfor %}
+{% endif %}
+{% if image_registry.internal_registry_hostname is defined %}
+{% for entry in image_registry.internal_registry_hostname %}
+status:
+  internalRegistryHostname: {{ entry }}
+{% endfor %}
+{% endif %}

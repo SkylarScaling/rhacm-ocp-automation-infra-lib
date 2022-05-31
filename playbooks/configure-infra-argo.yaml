@@ -1,0 +1,38 @@
+---
+################################################################################
+############ Add Application to ArgoCD
+################################################################################
+- name: Create Argocd Cluster Infra Application
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  vars:
+    infra_cluster_configs: "../../ocp-gitops-infra-config/clusters"
+  tasks:
+  - block:
+    - include_vars: "{{ infra_cluster_configs }}/{{ hub_cluster_name }}/auth/kubeadmin-password"
+
+    - name: Login to cluster (obtain access token)
+      community.kubernetes.k8s_auth:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        username: kubeadmin
+        password: "{{ kubeadmin_pass }}"
+      register: k8s_auth_results
+
+    - name: Configure Argo Application for Operators
+      include_role:
+        name: argocd-operators
+
+    - name: Configure Argo Application for Cluster
+      include_role:
+        name: argocd-application
+
+    always:
+      - name: If login succeeded, try to log out (revoke access token)
+        when: k8s_auth_results.k8s_auth.api_key is defined
+        community.kubernetes.k8s_auth:
+          host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+          validate_certs: no
+          state: absent
+          api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"

@@ -1,0 +1,10 @@
+{% if image_registry.additional_ca.name is defined %}
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: {{ image_registry.additional_ca.name }}
+  namespace: openshift-config
+data:
+  ca-bundle.crt: |
+    {{ additional_ca_raw_data | indent(4)  }}
+{% endif %}

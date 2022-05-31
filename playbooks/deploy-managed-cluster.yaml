@@ -1,0 +1,49 @@
+---
+#################################################################################
+############ Deploy Dev Cluster
+#################################################################################
+- name: Prepare for dev cluster install
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: "~/.{{ cloud_provider }}/ is present"
+      file:
+        path: "~/.{{ cloud_provider }}/"
+        state: directory
+
+    - name: "Set {{ cloud_provider }}_creds fact"
+      set_fact:
+        cloud_creds: "{{ lookup('file', './cloud_providers/{{ cloud_provider }}/files/{{ cloud_provider }}_creds') }}"
+      no_log: true
+
+    - name: Copy credentials
+      template:
+        src: "./templates/credentials.j2"
+        dest: "~/.{{ cloud_provider }}/credentials"
+      no_log: true
+
+- import_playbook: "./cloud_providers/{{ cloud_provider }}/deploy_managed_cluster.yaml"
+  tags:
+    - deploy_managed_cluster
+
+- name: Manage kubeconfig and credentials
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Set managed fact
+      set_fact:
+        cluster_type: 'managed'
+
+    - name: Store kubeadmin creds
+      include_role:
+        name: store_kubeadmin_pass
+
+- import_playbook: "./setup-sso.yaml"
+  tags:
+    - setup_sso
+
+- import_playbook: "./cloud_providers/{{ cloud_provider }}/add_node_policies.yaml"
+  tags:
+    - add_node_policy

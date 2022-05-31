@@ -1,0 +1,72 @@
+---
+- name: Deploy Managed Cluster
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  tags:
+    - deploy_managed_cluster
+  collections:
+    - aws.awscollections
+  vars:
+    infra_out_clusters: "../../../ocp-gitops-infra-config/clusters"
+  tasks:
+  - block:
+    - debug:
+        msg: "Deploy Managed Cluster"
+
+    - set_fact:
+        cluster_region: '{{ install_config.aws_region }}'
+
+    - name: Create Cluster
+      include_role:
+        name: ocp_managed_cluster
+      vars:
+        cluster_name: '{{ ocp_cluster.name }}'
+
+    - include_vars: "../{{ infra_out_clusters }}/{{ hub_cluster_name }}/auth/kubeadmin-password"
+
+    - name: Login to hub (obtain access token)
+      community.kubernetes.k8s_auth:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        username: kubeadmin
+        password: "{{ kubeadmin_pass }}"
+      register: k8s_auth_results
+
+    - name: Get kubeadmin creds for managed cluster
+      k8s_info:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        kind: Secret
+        namespace: "{{ cluster_name }}"
+        label_selectors:
+          - hive.openshift.io/secret-type=kubeadmincreds
+      register: kube_secret
+      until: (kube_secret.resources is defined) and (kube_secret.resources|length > 0)
+      delay: 30
+      retries: 25
+
+    - name: Watch provisioning pod until it's complete
+      k8s_info:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        kind: Pod
+        namespace: "{{ cluster_name }}"
+        label_selectors:
+          - hive.openshift.io/install=true
+      register: pod
+      until: (pod.resources[0].status.phase == 'Succeeded')
+      delay: 300
+      retries: 25
+
+    always:
+      - name: If login succeeded, try to log out (revoke access token)
+        when: k8s_auth_results.k8s_auth.api_key is defined
+        community.kubernetes.k8s_auth:
+          host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+          validate_certs: no
+          state: absent
+          api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"

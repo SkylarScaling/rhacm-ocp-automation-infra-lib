@@ -1,0 +1,50 @@
+[
+  {
+    "ParameterKey": "InfrastructureName",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "RhcosAmi",
+    "ParameterValue": "ami-0a57c1b4939e5ef5b"
+  },
+  {
+    "ParameterKey": "AllowedBootstrapSshCidr",
+    "ParameterValue": "0.0.0.0/0"
+  },
+  {
+    "ParameterKey": "PublicSubnet",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "MasterSecurityGroupId",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "VpcId",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "BootstrapIgnitionLocation",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "AutoRegisterELB",
+    "ParameterValue": "yes"
+  },
+  {
+    "ParameterKey": "RegisterNlbIpTargetsLambdaArn",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "ExternalApiTargetGroupArn",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "InternalApiTargetGroupArn",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "InternalServiceTargetGroupArn",
+    "ParameterValue": ""
+  }
+]

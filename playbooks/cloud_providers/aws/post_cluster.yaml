@@ -1,0 +1,21 @@
+---
+- name: Post Cluster
+  hosts: localhost
+  vars:
+    kubeconfig: "{{ working_dir }}/install/{{ install_config.cluster_name }}/auth/kubeconfig"
+  connection: local
+  become: false
+  gather_facts: false
+  tags:
+    - post_cluster
+  collections:
+    - aws.awscollections
+  tasks:
+    - debug:
+        msg: "Post Install Cluster Configuration"
+
+    - name: Configure Argo Application for Cluster
+      include_role:
+        name: configure-gitops
+
+

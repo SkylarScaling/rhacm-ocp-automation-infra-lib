@@ -1,0 +1,8 @@
+---
+- name: "Update Kustomizatoin with machineset"
+  lineinfile:
+    insertafter: "resources:"
+    state: "{{ state }}"
+    dest: "{{ manifests_output_dir.path }}/kustomization.yaml" 
+    line: "- {{ cluster_id }}-{{ ms_name }}-{{ availability_zone.name }}.yaml"
+

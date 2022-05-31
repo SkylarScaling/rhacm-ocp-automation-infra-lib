@@ -1,0 +1,18 @@
+---
+- name: Configure Federated-Prometheus
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  tags:
+    - configure grafana-resource
+  vars:
+    manifests_output_path: "../../ocp-gitops-infra-config/clusters/{{ cluster_name }}"
+    output_path: "{{ manifests_output_path }}/grafana-resource"
+  tasks:
+    - debug:
+        msg: "configure grafana-resource"
+    - name: Configure Grafana resrouce
+      include_role:
+        name: configure_grafana_resource
+

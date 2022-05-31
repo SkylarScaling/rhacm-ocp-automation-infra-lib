@@ -1,0 +1,30 @@
+[
+  {
+    "ParameterKey": "InfrastructureName",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "RhcosAmi",
+    "ParameterValue": "ami-05ed2cc6e70392ff9"
+  },
+  {
+    "ParameterKey": "NetworkInterfaceId",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "IgnitionLocation",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "CertificateAuthorities",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "WorkerInstanceProfileName",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "WorkerInstanceType",
+    "ParameterValue": "c5n.18xlarge"
+  }
+]

@@ -1,0 +1,16 @@
+---
+################################################################################
+############ Add RH Subs Entitlements to Cluster
+################################################################################
+- name: Create Machine Config for RH Entitlements
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  tasks:
+    - name: Register entitlement PEM
+      set_fact:
+        base64_entitlement_pem: "{{ rh_entitlement_base64 }}"
+
+    - name: Configure Entitlement Machine Config
+      include_role:
+        name: configure-cluster-entitlements

@@ -1,0 +1,93 @@
+---
+- name: Create install_dir to work in
+  ansible.builtin.file:
+    state: directory
+    path: "{{ working_dir }}/install/{{ ocp_cluster.name }}"
+  register: install_dir
+
+- name: Print install_dir location for admin
+  ansible.builtin.debug:
+    msg: "The working directory location is {{ install_dir.path }}"
+
+- name: Copy install-config.yaml into install_dir
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../../templates/install-config.yaml.j2"
+    dest: "{{ install_dir.path }}/install-config.yaml"
+
+- name: Get files from config directory
+  command: "ls {{ playbook_dir }}/../../../hub-config/managed-clusters/config/templates"
+  register: config_dir
+
+- name: Populate config templates
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../../../hub-config/managed-clusters/config/templates/{{ item }}"
+    dest: "{{ install_dir.path }}/{{ item }}"
+  with_items: "{{ config_dir.stdout_lines }}"
+
+- name: Deploy Configuration
+  block:
+    - include_vars: "{{ infra_out_clusters }}/{{ hub_cluster_name }}/auth/kubeadmin-password"
+
+    - name: Login to cluster (obtain access token)
+      community.kubernetes.k8s_auth:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        username: kubeadmin
+        password: "{{ kubeadmin_pass }}"
+      register: k8s_auth_results
+
+    - name: Deploy configuration from files
+      k8s:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        state: present
+        src: "{{ install_dir.path }}/{{ item }}"
+      with_items: "{{ config_dir.stdout_lines }}"
+
+    - name: Get ClusterImageSets
+      k8s_info:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        kind: ClusterImageSet
+        api_version: hive.openshift.io/v1
+      register: cluster_image_sets
+
+    - set_fact:
+        version_prefix: "img{{ ocp_cluster.ocp_version }}"
+
+    - name: Get ClusterImageSet for desired version
+      set_fact:
+        cluster_image_set: "{{ item.metadata.name }}"
+      with_items: "{{ cluster_image_sets.resources }}"
+      no_log: true
+      when: "item.metadata.name.startswith(version_prefix)"
+
+    - name: Get files from deployment directory
+      command: "ls {{ playbook_dir }}/../../../hub-config/managed-clusters/deployments"
+      register: deploy_dir
+
+    - name: Populate deployment templates
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../../hub-config/managed-clusters/deployments/{{ item }}"
+        dest: "{{ install_dir.path }}/{{ item }}"
+      with_items: "{{ deploy_dir.stdout_lines }}"
+
+    - name: Deploy cluster from files
+      k8s:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        state: present
+        src: "{{ install_dir.path }}/{{ item }}"
+      with_items: "{{ deploy_dir.stdout_lines }}"
+
+  always:
+    - name: If login succeeded, try to log out (revoke access token)
+      when: k8s_auth_results.k8s_auth.api_key is defined
+      community.kubernetes.k8s_auth:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        state: absent
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"

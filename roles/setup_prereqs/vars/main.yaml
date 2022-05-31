@@ -1,0 +1,15 @@
+---
+bin_dir: /usr/local/bin
+
+force_update: false
+
+openshift_version: stable-4.9
+
+openshift_install_url: https://mirror.openshift.com/pub/openshift-v4/clients/ocp/{{ openshift_version }}/openshift-install-linux.tar.gz
+
+openshift_cli_url: https://mirror.openshift.com/pub/openshift-v4/clients/ocp/{{ openshift_version }}/openshift-client-linux.tar.gz
+
+openshift_install: "{{ bin_dir }}/openshift-install"
+
+oc: "{{ bin_dir }}/oc"
+...

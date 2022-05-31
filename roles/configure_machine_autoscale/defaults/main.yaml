@@ -1,0 +1,14 @@
+default_max_nodes: 20
+default_min_cores: 8
+default_max_cores: 200
+default_min_memory: 16
+default_max_memory: 512
+default_gpu_type: 'nvidia.com/gpu'
+default_gpu_min: 0
+default_gpu_max: 32
+default_scaledown_enabled: 'true'
+default_scaledown_delay_after_add: '10m'
+default_scaledown_delay_after_delete: '5m'
+default_scaledown_delay_after_failure: '1m'
+default_scaledown_unneeded_time: '5m'
+ 

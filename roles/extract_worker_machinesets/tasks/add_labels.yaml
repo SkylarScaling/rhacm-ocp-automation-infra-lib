@@ -1,0 +1,33 @@
+---
+- name: replace metadata if empty
+  lineinfile:
+    path: "{{ manifests_output_dir.path }}/{{ work_machine.metadata.name }}.yaml"
+    line: "      metadata:"
+    regex: "      metadata: {}"
+    state: "{{ state }}"
+  when:
+  - additional_labels is defined
+
+- name: add labels tag
+  lineinfile:
+    path: "{{ manifests_output_dir.path }}/{{ work_machine.metadata.name }}.yaml"
+    line: "        labels:"
+    insertafter: '^ {6}(metadata)'
+    state: "{{ state }}"
+  when:
+  - additional_labels is defined
+
+- name: add labels
+  lineinfile:
+    path: "{{ manifests_output_dir.path }}/{{ work_machine.metadata.name }}.yaml"
+    line: "          {{ new_label.key }}: '{{ new_label.value }}'"
+    insertafter: '^ {8}(labels)'
+    state: "{{ state }}"    
+  loop: "{{ additional_labels }}"
+  loop_control:
+    loop_var: new_label
+  when:
+  - additional_labels is defined
+
+
+ 

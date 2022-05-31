@@ -1,0 +1,4 @@
+---
+- include_tasks: get_workers.yaml
+
+

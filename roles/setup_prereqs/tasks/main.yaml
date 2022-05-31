@@ -1,0 +1,9 @@
+---
+- name: Download appropriate python libraries
+  import_tasks: download-python-libraries.yaml
+  become: true
+
+- name: Download OCP binaries
+  import_tasks: download-ocp-binaries.yaml
+  become: true
+...

@@ -1,0 +1,28 @@
+apiVersion: cert-manager.io/v1alpha3
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+  namespace: cert-manager
+spec:
+  acme:
+    # The ACME server URL
+    server: https://acme-v02.api.letsencrypt.org/directory
+    # Use the staging server for testing to avoid rate limits
+    # server: https://acme-staging-v02.api.letsencrypt.org/directory
+    # Email address used for ACME registration
+    email: 'Other_delfi_openshift_admin@<domain>'
+    # Name of a secret used to store the ACME account private key
+    privateKeySecretRef:
+      name: cert-manager-le-key
+    solvers:
+    - selector:
+        dnsZones:
+          - "{{ install_config.base_domain }}"
+      dns01:
+        route53:
+          region: "{{ install_config.aws_region }}"
+          accessKeyID: "{{ aws.aws_access_key_id }}"
+          hostedZoneID: "{{ hosted_zone_id }}"
+          secretAccessKeySecretRef:
+            name: "{{cluster_name}}-aws-creds"
+            key: "aws_secret_access_key"

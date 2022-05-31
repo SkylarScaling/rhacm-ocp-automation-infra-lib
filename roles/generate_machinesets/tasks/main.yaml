@@ -1,0 +1,39 @@
+---
+- name: Get cluster ID
+  include_role:
+    name: get_managed_cluster_id
+
+- name: create manifests output dir
+  ansible.builtin.file:
+    state: directory
+    path: "{{ manifests_output_path }}"
+  register: manifests_output_dir
+
+- name: print install_dir location for admin
+  ansible.builtin.debug:
+    msg: "The manifests directory location is {{ manifests_output_dir.path }} : {{ ms_name }},{{ instance_type }},{{ availability_zone }}"
+
+- name: Fetch ami_instance name for the specified region
+  ec2_ami_info:
+    aws_access_key: "{{ aws.aws_access_key_id }}"
+    aws_secret_key: "{{ aws.aws_secret_access_key }}"
+    region: "{{ install_config.aws_region }}"
+    filters:
+      name: rhcos-47.83.202103251640-0
+  register: ami_info
+
+- debug:
+    msg: "{{ ami_info.images | json_query('[0].image_id') }}"
+
+- name: Set ami_instance fact
+  set_fact:
+    ami_instance: "{{ ami_info.images | json_query('[0].image_id') }}"
+
+- name: copy machine set templte into manifests_output_dir
+  ansible.builtin.template: 
+    src: "machine-set.yaml.j2"
+    dest: "{{ manifests_output_dir.path }}/{{ cluster_id }}-{{ ms_name }}-{{ availability_zone.name }}.yaml"
+
+- include_tasks: update_gitops_config.yaml
+
+

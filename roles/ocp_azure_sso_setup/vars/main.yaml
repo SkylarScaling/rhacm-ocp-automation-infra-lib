@@ -1,0 +1,14 @@
+---
+az_tenant_id: "<TODO>"
+az_client_id: "<TODO>>"
+az_object_id: "<TODO>"
+az_token_url: "https://login.microsoftonline.com/{{ az_tenant_id }}/oauth2/v2.0/token"
+az_app_url: "https://graph.microsoft.com/v1.0/myorganization/applications/{{ az_object_id }}"
+az_token_body: >
+    client_id={{ az_client_id }}
+    &scope=https%3A%2F%2Fgraph.microsoft.com%2F.default
+    &client_secret={{ az_client_secret }}
+    &grant_type=client_credentials
+
+az_client_secret: <TODO Input Vault encrypted secret>
+...

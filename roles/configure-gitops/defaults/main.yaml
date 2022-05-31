@@ -1,0 +1,2 @@
+---
+default_gitops_secret: "ocp-gitops-infra-git"

@@ -1,0 +1,19 @@
+---
+- name: create install_dir to work in
+  ansible.builtin.file:
+    state: directory
+    path: "{{ working_dir }}/install/{{ ocp_cluster.name }}"
+  register: install_dir
+
+- name: print install_dir location for admin
+  ansible.builtin.debug:
+    msg: "The working directory location is {{ install_dir.path }}"
+
+- name: copy install-config.yaml into install_dir
+  ansible.builtin.template: 
+    src: "{{ playbook_dir }}/../../templates/install-config.yaml.j2"
+    dest: "{{ install_dir.path }}/install-config.yaml"
+
+- name: run IPI installer
+  command: "{{ bin_dir }}/openshift-install create cluster --dir={{ install_dir.path }}"
+  register: cluster_deploy

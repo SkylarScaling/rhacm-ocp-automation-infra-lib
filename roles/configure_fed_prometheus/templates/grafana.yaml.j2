@@ -1,0 +1,99 @@
+apiVersion: integreatly.org/v1alpha1
+kind: Grafana
+metadata:
+  name: federated-grafana
+  labels:
+    app: federated-grafana
+  namespace: federated-prometheus
+spec:
+  config:
+    log:
+      mode: "console"
+      level: "warn"
+    users:
+      auto_assign_org: True
+      auto_assign_org_role: Editor
+    auth:
+      disable_login_form: False
+      disable_signout_menu: False
+      signout_redirect_url: https://grafana-route-federated-prometheus.apps.{{ cluster_name }}.{{ install_config.base_domain }}
+    auth.basic:
+      enabled: True
+    auth.anonymous:
+      enabled: False
+    auth.proxy:
+      auto_sign_up: true
+      enabled: true
+      header_name: X-Forwarded-User
+    security:
+      admin_user: "admin"
+      auto_assign_org_role: Admin 
+  
+  containers:
+    - args:
+        - '-provider=openshift'
+        - '-pass-basic-auth=false'
+        - '-https-address=:9091'
+        - '-http-address='
+        - '-email-domain=*'
+        - '-upstream=http://localhost:3000'
+        - '-openshift-sar={"namespace": "federated-prometheus", "resource": "services", "name": "grafana-proxy", "verb": "get"}'        
+        - '-openshift-delegate-urls={"/": {"resource": "namespaces", "verb": "get"}}'
+        - '-tls-cert=/etc/tls/private/tls.crt'
+        - '-tls-key=/etc/tls/private/tls.key'
+        - '-client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token'
+        - '-cookie-secret-file=/etc/proxy/secrets/session_secret'
+        - '-openshift-service-account=grafana-serviceaccount'
+        - '-openshift-ca=/etc/pki/tls/cert.pem'
+        - '-openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt'
+        - '-skip-auth-regex=^/metrics'
+      image: 'quay.io/openshift/origin-oauth-proxy:4.3'
+      name: grafana-proxy
+      ports:
+        - containerPort: 9091
+          name: grafana-proxy
+     
+      volumeMounts:
+         - name: secret-grafana-k8s-tls
+           mountPath: /etc/tls/private
+         - name: secret-grafana-k8s-proxy
+           mountPath: /etc/proxy/secrets
+  
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 500m   
+          memory: 1Gi  
+          
+  secrets:
+    - grafana-k8s-tls
+    - grafana-k8s-proxy
+  service:
+    ports:
+      - name: grafana-proxy
+        port: 9091
+        protocol: TCP
+        targetPort: grafana-proxy
+    annotations:
+      service.alpha.openshift.io/serving-cert-secret-name: grafana-k8s-tls
+      
+  ingress:
+    enabled: True
+    targetPort: grafana-proxy
+    termination: reencrypt
+    annotations:
+      haproxy.router.openshift.io/timeout: 180s
+      openshift.io/timeout: 180s   
+  client:
+    preferService: True
+  serviceAccount:
+    annotations:
+      serviceaccounts.openshift.io/oauth-redirectreference.primary: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"grafana-route"}}'
+  dashboardLabelSelector:
+    - matchExpressions:
+        - { key: "ocp-app", operator: In, values: ['federated-grafana'] }
+
+
+---

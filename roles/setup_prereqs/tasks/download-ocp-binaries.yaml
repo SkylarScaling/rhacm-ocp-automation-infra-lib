@@ -1,0 +1,54 @@
+---
+- name: "{{ bin_dir }} is present"
+  file:
+    path: "{{ bin_dir }}"
+    state: directory
+
+- name: Removing existing binaries to force update
+  block:
+    - name: Removing openshift_install
+      ansible.builtin.file:
+        path: "(( openshift_install }}"
+        state: absent
+
+    - name: Removing oc
+      ansible.builtin.file:
+        path: "{{ oc }}"
+        state: absent
+  when: force_update|bool
+
+- name: Check if OpenShift installer is already installed
+  stat:
+    path: "{{ openshift_install }}"
+  register: openshift_install_stat
+
+- name: Check if oc binary is already installed
+  stat:
+    path: "{{ oc }}"
+  register: oc_binary_stat
+
+- name: Download and install binaries
+  block:
+    - name: Install OpenShift installer and CLI
+      unarchive:
+        src: "{{ item }}"
+        remote_src: yes
+        dest: "{{ bin_dir }}"
+        mode: '755'
+        exclude:
+          - README.md
+      loop:
+        - "{{ openshift_install_url }}"
+        - "{{ openshift_cli_url }}"
+
+    - name: Copy OpenShift installer and CLI
+      file:
+        path: "{{ bin_dir }}/{{ item }}"
+        mode: "+x"
+        state: touch
+      loop:
+        - oc
+        - kubectl
+        - openshift-install
+  when: not openshift_install_stat.stat.exists or not oc_binary_stat.stat.exists
+...

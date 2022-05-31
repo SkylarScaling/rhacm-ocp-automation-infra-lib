@@ -1,0 +1,20 @@
+---
+- name: Deploy Hub Cluster
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  tags:
+    - deploy_hub_cluster
+  collections:
+    - aws.awscollections
+  tasks:
+    - debug:
+        msg: "Deploy Hub Cluster"
+
+    - name: Create Cluster 
+      include_role: 
+        name: ocp_hub_cluster
+      vars:
+        cluster_name: '{{ ocp_cluster.name }}'
+

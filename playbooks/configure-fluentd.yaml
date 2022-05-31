@@ -1,0 +1,18 @@
+---
+- name: Configure fluentd
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  tags:
+    - configure fluentd
+  vars:
+    manifests_output_path: "../../ocp-gitops-infra-config/clusters/{{ cluster_name }}"
+    output_path: "{{ manifests_output_path }}/fluentd"
+  tasks:
+    - debug:
+        msg: "configure fluentd"
+    - name: Configure fluentd
+      include_role:
+        name: configure_fluentd
+

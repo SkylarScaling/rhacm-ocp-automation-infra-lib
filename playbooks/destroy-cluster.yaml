@@ -1,0 +1,47 @@
+---
+# vim: set ft=ansible:
+
+# This playbook is basically deploy-cluster.yaml in reverse order.
+
+################################################################################
+############ Step 0000 Setup Runtime
+################################################################################
+
+#- import_playbook: setup_runtime.yml
+#  tags:
+#    - setup_runtime
+
+################################################################################
+########### Step -002 Post Cluster Destroy Tasks
+################################################################################
+
+#- import_playbook: "./cloud_providers/{{ cloud_provider }}/post_cluster.yaml"
+#  tags:
+#    - post_cluster
+#    - post_cluster_tasks
+#  vars:
+#    cloud_provider: '{{ ocp_cluster.cloud_provider }}'
+
+#################################################################################
+############ Step -001 Destroy Cluster
+#################################################################################
+
+#- import_playbook: "./cloud_providers/{{ cloud_provider }}/cluster.yaml"
+#  tags:
+#    - deploy_cluster
+#  vars:
+#    cloud_provider: '{{ ocp_cluster.cloud_provider }}'
+
+################################################################################
+############ Step -000 Pre Cluster Destroy Tasks
+################################################################################
+
+#- import_playbook: "./cloud_providers/{{ cloud_provider }}/pre_cluster.yaml"
+#  tags:
+#    - pre_cluster
+#    - pre_cluster_tasks
+#  vars:
+#    desired_state: absent
+#    ocp_cluster: '{{ ocp_cluster }}'
+#    cloud_provider: '{{ ocp_cluster.platform }}'
+

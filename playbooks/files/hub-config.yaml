@@ -1,0 +1,81 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hub-config
+  annotations:
+    openshift.io/description: 'Application representing the entirety of the hub configuration. Apps and all.'
+    openshift.io/display-name: hub-config
+---
+apiVersion: apps.open-cluster-management.io/v1
+kind: Channel
+metadata:
+  labels:
+    app: hub-config
+  name: git-channel
+  namespace: git-channels
+spec:
+  gates: {}
+  pathname: 'https://<repo_url>/ocp-infra-lib'
+  type: Git
+  secretRef:
+    name: 'ocp-git'
+---
+apiVersion: apps.open-cluster-management.io/v1
+kind: PlacementRule
+metadata:
+  labels:
+    app: hub-config
+  name: all-clusters
+  namespace: hub-config
+spec:
+  clusterConditions:
+    - status: 'True'
+      type: ManagedClusterConditionAvailable
+---
+apiVersion: apps.open-cluster-management.io/v1
+kind: PlacementRule
+metadata:
+  labels:
+    app: hub-config
+  name: managed-clusters
+  namespace: hub-config
+spec:
+  clusterSelector:
+    matchLabels:
+      type: managed
+---
+apiVersion: app.k8s.io/v1beta1
+kind: Application
+metadata:
+  labels:
+    app: hub-config
+    type: config
+  name: hub-config
+  namespace: hub-config
+spec:
+  componentKinds:
+    - group: apps.open-cluster-management.io/v1
+      kind: Subscription
+  descriptor: {}
+  selector:
+    matchLabels:
+      app: hub-config
+---
+apiVersion: apps.open-cluster-management.io/v1
+kind: Subscription
+metadata:
+  annotations:
+    apps.open-cluster-management.io/git-path: hub-config/hub-cluster
+    apps.open-cluster-management.io/git-branch: ansible-automation
+  labels:
+    app: hub-config
+  name: hub-config-sub
+  namespace: hub-config
+spec:
+  channel: git-channels/git-channel
+  placement:
+    clusterSelector:
+      matchLabels:
+        name: local-cluster
+...

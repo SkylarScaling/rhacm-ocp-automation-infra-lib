@@ -1,0 +1,77 @@
+---
+- name: Set infra-config output path
+  set_fact:
+    infra_out_clusters: "../../ocp-gitops-infra-config/clusters"
+
+- name: Store Hub Cluster Credentials
+  block:
+    - name: Get kubeadmin password
+      set_fact:
+        kubeadmin_pass: "{{ lookup('file','/tmp/install/{{ hub_cluster_name }}/auth/kubeadmin-password') }}"
+
+    - name: Encrypt test file
+      command: ansible-vault encrypt_string --vault-password-file ~/.passfile '{{ kubeadmin_pass }}' --name 'kubeadmin_pass'
+      register: encrypted_var
+
+    - name: Create cluster auth output dir
+      ansible.builtin.file:
+        state: directory
+        path: "{{ infra_out_clusters }}/{{ hub_cluster_name}}/auth"
+      register: manifests_output_dir
+
+    - name: Create kubeadmin-password file
+      copy:
+        dest: "{{ infra_out_clusters }}/{{ hub_cluster_name}}/auth/kubeadmin-password"
+        content: "{{ encrypted_var.stdout }}"
+  when: cluster_type == 'hub'
+
+- name: Store Managed Cluster Credentials
+  block:
+    - include_vars: "{{ infra_out_clusters }}/{{ hub_cluster_name }}/auth/kubeadmin-password"
+
+    - name: Login to hub (obtain access token)
+      community.kubernetes.k8s_auth:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        username: kubeadmin
+        password: "{{ kubeadmin_pass }}"
+      register: k8s_auth_results
+
+    - name: Get kubeadmin creds for managed cluster
+      community.kubernetes.k8s_info:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        kind: Secret
+        namespace: "{{ cluster_name }}"
+        label_selectors:
+          - hive.openshift.io/secret-type=kubeadmincreds
+      register: kube_secret
+
+    - name: Set kubeadmin pass fact
+      set_fact:
+        kubeadmin_pass: "{{ kube_secret.resources[0].data.password | b64decode }}"
+
+    - name: Encrypt test file
+      command: ansible-vault encrypt_string --vault-password-file ~/.passfile '{{ kubeadmin_pass }}' --name 'kubeadmin_pass'
+      register: encrypted_var
+
+    - name: Create cluster auth output dir
+      ansible.builtin.file:
+        state: directory
+        path: "{{ infra_out_clusters }}/{{ cluster_name }}/auth"
+      register: manifests_output_dir
+
+    - name: Create kubeadmin-password file
+      copy:
+        dest: "{{ infra_out_clusters }}/{{ cluster_name}}/auth/kubeadmin-password"
+        content: "{{ encrypted_var.stdout }}"
+  when: cluster_type == 'managed'
+  always:
+    - name: If login succeeded, try to log out (revoke access token)
+      when: k8s_auth_results.k8s_auth.api_key is defined
+      community.kubernetes.k8s_auth:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        state: absent
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"

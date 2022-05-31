@@ -1,0 +1,21 @@
+---
+- debug:
+    msg: "Installling Argo Application for cluster {{ cluster_name }} and API: {{ cluster_server_api }}"
+
+- name: copy git repo config template
+  ansible.builtin.template:
+    src: "argo-operator-application.yaml.j2"
+    dest: "{{ working_dir }}/operator-git-repo.yaml"
+
+- name: Apply Git Configuration
+  k8s:
+    host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+    validate_certs: no
+    api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+    src: "{{ working_dir }}/operator-git-repo.yaml"
+    state: "{{ state }}"
+    namespace: "openshift-gitops"
+    api_version: v1
+  no_log: true
+  when: state == 'present'
+

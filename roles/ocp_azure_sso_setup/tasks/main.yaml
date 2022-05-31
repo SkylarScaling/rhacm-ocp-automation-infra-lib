@@ -1,0 +1,53 @@
+---
+- name: Login to Azure
+  uri:
+    url: "{{ az_token_url }}"
+    method: POST
+    body: "{{ az_token_body }}"
+    headers:
+      Content-Type: "application/x-www-form-urlencoded"
+    status_code: 200
+  register: login
+
+- name: Set Bearer token as fact
+  set_fact:
+    az_bearer: "{{ login.json.access_token }}"
+
+- name: Get Application
+  uri:
+    url: "https://graph.microsoft.com/v1.0/myorganization/applications/{{ az_object_id }}"
+    method: GET
+    headers:
+      Authorization: "Bearer {{ az_bearer }}"
+  register: app_get
+
+- name: Get current Redirect URIs from application
+  set_fact:
+    uri_list: "{{ app_get.json.web.redirectUris }}"
+
+- name: Create new Redirect URI for cluster
+  set_fact:
+    redirect_uri: "https://oauth-openshift.apps.{{ cluster_name }}.<domain>>/oauth2callback/OCP_AAD"
+
+- name: Add new Redirect URI to list
+  set_fact:
+    uri_list: "{{ uri_list + [ redirect_uri ] }}"
+
+- name: Join Redirect URIs list
+  set_fact:
+    uris: "{{ uri_list | join('\",\"') }}"
+
+- name: Populate patch
+  template:
+    src: "../files/patch.j2"
+    dest: "~/temp/patch.json"
+
+- name: Patch Application
+  uri:
+    url: "https://graph.microsoft.com/v1.0/myorganization/applications/{{ az_object_id }}"
+    method: PATCH
+    body: "{{ lookup('file','~/temp/patch.json') }}"
+    body_format: json
+    headers:
+      Authorization: "Bearer {{ az_bearer }}"
+  register: app_patch

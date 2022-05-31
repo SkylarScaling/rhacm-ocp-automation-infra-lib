@@ -1,0 +1,37 @@
+---
+- name: Get cluster ID
+  include_role:
+    name: get_managed_cluster_id
+
+- name: create manifests output dir
+  ansible.builtin.file:
+    state: directory
+    path: "{{ manifests_output_path }}"
+  register: manifests_output_dir
+
+- name: print install_dir location for admin
+  ansible.builtin.debug:
+    msg: "The manifests directory location is {{ manifests_output_dir.path }}"
+
+- name: copy clusterscaler config into manifests_output_dir
+  ansible.builtin.template: 
+    src: "cluster_scaler.yaml.j2"
+    dest: "{{ manifests_output_dir.path }}/cluster_scaler.yaml"
+  when:
+    - machine_autoscale is defined and machine_autoscale.enabled == 'true'
+
+- name: "Update Kustomizatoin with cluster scaler"
+  lineinfile:
+    insertafter: "resources:"
+    state: "{{ state }}"
+    dest: "{{ manifests_output_dir.path }}/kustomization.yaml"
+    line: "- cluster_scaler.yaml"
+
+- name: create machine autoscalers
+  include: create_machineset_scaler.yaml
+  loop: "{{ autoscale_config.machinesets }}"
+  loop_control:
+    loop_var: machineset
+
+#- include_tasks: update_gitops_config.yaml
+

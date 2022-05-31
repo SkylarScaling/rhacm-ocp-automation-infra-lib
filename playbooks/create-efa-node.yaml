@@ -1,0 +1,14 @@
+---
+- name: Deploy EFA Worker Node to Cluster
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  vars:
+    kubeconfig: "~/.kube/config"
+    infra_out_clusters: "../../ocp-gitops-infra-config/clusters"
+    manifests_output_path: "{{ infra_out_clusters }}/{{ cluster_name }}"
+  tasks:
+    - name: Import role
+      include_role:
+        name: aws_create_efa_node

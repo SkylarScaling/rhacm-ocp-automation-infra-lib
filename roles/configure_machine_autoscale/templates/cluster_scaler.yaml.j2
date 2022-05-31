@@ -1,0 +1,24 @@
+apiVersion: "autoscaling.openshift.io/v1"
+kind: "ClusterAutoscaler"
+metadata:
+  name: "default"
+spec:
+  podPriorityThreshold: -10 
+  resourceLimits:
+    maxNodesTotal: {{ autoscale_config.autoscale_max_nodes | default(default_max_nodes) }}
+    cores:
+      min: {{ autoscale_config.autoscale_min_cores | default(default_min_cores) }} 
+      max: {{ autoscale_config.autoscale_max_cores | default(default_max_cores) }}
+    memory:
+      min: {{ autoscale_config.autoscale_min_memory | default(default_min_memory) }}
+      max: {{ autoscale_config.autoscale_max_memory | default(default_max_memory) }}
+    gpus:
+      - type: {{ autoscale_config.autoscale_gpu_type | default(default_gpu_type) }}
+        min: {{ autoscale_config.autoscale_gpu_min | default(default_gpu_min) }}
+        max: {{ autoscale_config.autoscale_gpu_max | default(default_gpu_max) }}
+  scaleDown: 
+    enabled: {{ autoscale_config.autoscale_scaledown_enabled | default(default_scaledown_enabled) }}
+    delayAfterAdd: {{ autoscale_config.autoscale_scaledown_delay_after_add | default(default_scaledown_delay_after_add) }}
+    delayAfterDelete: {{ autoscale_config.autoscale_scaledown_delay_after_delete | default(default_scaledown_delay_after_delete) }}
+    delayAfterFailure: {{ autoscale_config.autoscale_scaledown_delay_after_failure | default(default_scaledown_delay_after_failure) }}
+    unneededTime: {{ autoscale_config.autoscale_scaledown_unneeded_time | default(default_scaledown_unneeded_time) }}

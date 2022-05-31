@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: "{{ cluster_name }}"
+  annotations:
+    openshift.io/description: 'Application representing the {{ cluster_name }} managed cluster.'
+    openshift.io/display-name: '{{ cluster_name }} (Managed Cluster)'

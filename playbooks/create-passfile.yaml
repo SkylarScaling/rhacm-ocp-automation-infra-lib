@@ -1,0 +1,14 @@
+---
+- name: Store vault password to local file
+  gather_facts: false
+  hosts: localhost
+  vars_prompt:
+    - name: vaultpass
+      prompt: Enter Vault Password
+      private: yes
+      confirm: yes
+  tasks:
+    - name: Populate password file
+      copy:
+        dest: "~/.passfile"
+        content: "{{ vaultpass }}"

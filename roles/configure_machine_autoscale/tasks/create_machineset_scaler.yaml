@@ -1,0 +1,14 @@
+---
+- name: copy machinescaler config into manifests_output_dir
+  ansible.builtin.template: 
+    src: "machine_scaler.yaml.j2"
+    dest: "{{ manifests_output_dir.path }}/autoscaler-{{ cluster_id }}-{{ machineset.name }}-{{ machineset.zone }}.yaml"
+  when:
+    - machine_autoscale is defined and machine_autoscale.enabled == 'true'
+
+- name: "Update Kustomizatoin with autoscaler"
+  lineinfile:
+    insertafter: "resources:"
+    state: "{{ state }}"
+    dest: "{{ manifests_output_dir.path }}/kustomization.yaml"
+    line: "- autoscaler-{{ cluster_id }}-{{ machineset.name }}-{{ machineset.zone }}.yaml"

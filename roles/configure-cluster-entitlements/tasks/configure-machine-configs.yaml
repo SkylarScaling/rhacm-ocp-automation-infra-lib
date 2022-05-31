@@ -1,0 +1,50 @@
+---
+- name: create temporary file
+  tempfile:
+    state: directory
+    suffix: temp
+  register: tempfile_kubedir
+
+- debug:
+    msg: "RH Entitlements Machine Configs for cluster {{ cluster_name }} and {{ tempfile_kubedir }}"
+
+- name: copy git repo config template
+  ansible.builtin.template:
+    src: "0003-cluster-entitlement-machineconfigs.yaml.j2"
+    dest: "{{ tempfile_kubedir.path }}/machine_config_{{ cluster_name }}.yaml"
+
+- name: Set infra-config output path
+  set_fact:
+    infra_out_clusters: "../../../ocp-gitops-infra-config/clusters"
+
+- name: "Getting infra id for cluster {{ cluster_name }}"
+  block:
+    - include_vars: "{{ infra_out_clusters }}/{{ cluster_name }}/auth/kubeadmin-password"
+
+    - name: Login to cluster (obtain access token)
+      community.kubernetes.k8s_auth:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        username: kubeadmin
+        password: "{{ kubeadmin_pass }}"
+      register: k8s_auth_results
+
+    - name: Apply MachineConfig Configuration
+      k8s:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        src: "{{ tempfile_kubedir.path }}/machine_config_{{ cluster_name }}.yaml"
+        state: "{{ state }}"
+        namespace: "openshift-machine-api"
+        api_version: v1
+      when: state == 'present'
+
+  always:
+    - name: If login succeeded, try to log out (revoke access token)
+      when: k8s_auth_results.k8s_auth.api_key is defined
+      community.kubernetes.k8s_auth:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        state: absent
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"

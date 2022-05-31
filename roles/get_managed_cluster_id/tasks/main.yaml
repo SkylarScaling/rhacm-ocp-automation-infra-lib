@@ -1,0 +1,46 @@
+---
+- name: Set infra-config output path
+  set_fact:
+    cluster_location: "../../../ocp-gitops-infra-config/clusters"
+
+- name: "Getting infrastructure id from cluster"
+  block:
+    - debug:
+        msg: "Getting infr id for cluster {{ cluster_name }}"
+
+    - include_vars: "{{ cluster_location }}/{{ cluster_name }}/auth/kubeadmin-password"
+
+    - name: Login to cluster (obtain access token)
+      community.kubernetes.k8s_auth:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        username: kubeadmin
+        password: "{{ kubeadmin_pass }}"
+      register: k8s_auth_results
+
+    - name: Get cluster id
+      k8s_info:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        api_version: config.openshift.io/v1
+        kind: Infrastructure
+        name: "cluster"
+      register: cluster_data
+
+    - name: "Verify Cluster Id"
+      debug:
+        msg: "Cluster id: {{ cluster_data.resources[0].status.infrastructureName }}"
+
+    - name: Set Cluster Id
+      set_fact:
+        cluster_id: "{{ cluster_data.resources[0].status.infrastructureName }}"
+
+  always:
+    - name: If login succeeded, try to log out (revoke access token)
+      when: k8s_auth_results.k8s_auth.api_key is defined
+      community.kubernetes.k8s_auth:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        state: absent
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"

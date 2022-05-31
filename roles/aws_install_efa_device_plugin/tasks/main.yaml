@@ -1,0 +1,9 @@
+---
+- name: Apply EFA DaemonSet to cluster
+  k8s:
+    host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+    validate_certs: no
+    api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+    src: "{{ role_path }}/files/efa-k8s-device-plugin.yaml"
+    state: "{{ state }}"
+  when: state == 'present'

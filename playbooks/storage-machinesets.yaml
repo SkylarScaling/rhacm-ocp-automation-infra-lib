@@ -1,0 +1,15 @@
+---
+- name: Create Storage Machine Sets
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  vars_files:
+    - "../../ocp-infra-deploy/sandbox/storage_vars.yaml"  
+  tasks:
+    - name: Generate Machine Sets
+      include_role:
+        name: generate_machinesets
+      vars:
+        manifests_output_path: "../../ocp-gitops-infra-config/temp"
+        availability_zone: "{{ item }}"
+      loop: "{{ availability_zones }}"

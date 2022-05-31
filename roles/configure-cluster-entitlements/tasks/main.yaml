@@ -1,0 +1,3 @@
+---
+# Configure Cluster Creds
+- include_tasks: configure-machine-configs.yaml

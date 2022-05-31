@@ -1,0 +1,10 @@
+---
+- name: Setup and Install Pre-Requisites
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Download required utilities
+      include_role:
+        name: setup_prereqs
+...

@@ -1,0 +1,78 @@
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  generation: 1
+  labels:
+    machine.openshift.io/cluster-api-cluster: {{ cluster_id }}
+  name: {{ cluster_id }}-{{ ms_name }}-{{ availability_zone.name }}
+  namespace: openshift-machine-api
+spec:
+  replicas: {{ availability_zone.replicas }}
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: {{ cluster_id }}
+      machine.openshift.io/cluster-api-machineset: {{ cluster_id }}-{{ ms_type }}-{{ availability_zone.name }}
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: {{ cluster_id }}
+        machine.openshift.io/cluster-api-machine-role: {{ ms_type }}
+        machine.openshift.io/cluster-api-machine-type: {{ ms_type }}
+        machine.openshift.io/cluster-api-machineset: {{ cluster_id }}-{{ ms_type }}-{{ availability_zone.name }}
+    spec:
+      metadata:
+        labels:
+          node-role.kubernetes.io/{{ ms_type }}: "" 
+{% if additional_labels is defined and additional_labels is iterable %}  
+{%- for _label in additional_labels  %}
+          {{ _label.key  }}: "{{ _label.value }}"
+{% endfor -%}
+{% endif %}
+{% if node_taints is defined and node_taints|length > 0 %}
+      taints: 
+{% for _taint in node_taints  %}
+      - effect: {{ _taint.effect }}
+        key: {{ _taint.key }}
+        value: '{{ _taint.value }}'
+{% endfor -%}          
+{% endif %}
+      providerSpec:
+        value:
+          ami:
+            id: {{ ami_instance }}
+          apiVersion: awsproviderconfig.openshift.io/v1beta1
+          blockDevices:
+          - ebs:
+              encrypted: true
+              iops: 0
+              kmsKey:
+                arn: ""
+              volumeSize: {{ volume_size }}
+              volumeType: {{ volume_type }}
+          credentialsSecret:
+            name: aws-cloud-credentials
+          deviceIndex: 0
+          iamInstanceProfile:
+            id: {{ cluster_id }}-worker-profile
+          instanceType: {{ instance_type }}
+          kind: AWSMachineProviderConfig
+          metadata:
+            creationTimestamp: null
+          placement:
+            availabilityZone: {{ availability_zone.name }}
+            region: {{ provider_region }}
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - {{ cluster_id }}-worker-sg
+          subnet:
+            filters:
+            - name: tag:Name
+              values:
+              - {{ cluster_id }}-private-{{ availability_zone.name }}
+          tags:
+          - name: kubernetes.io/cluster/{{ cluster_id }}
+            value: owned
+          userDataSecret:
+            name: worker-user-data

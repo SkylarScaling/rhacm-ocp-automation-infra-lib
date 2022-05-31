@@ -1,0 +1,27 @@
+---
+- name: create manifests output dir
+  ansible.builtin.file:
+    state: directory
+    path: "{{ manifests_output_path }}"
+  register: manifests_output_dir
+
+- name: print install_dir location for admin
+  ansible.builtin.debug:
+    msg: "The manifests directory location is {{ manifests_output_dir.path }}"
+
+- name: copy registr config into manifests_output_dir
+  ansible.builtin.template: 
+    src: "image_config.yaml.j2"
+    dest: "{{ manifests_output_dir.path }}/image_registry_config.yaml"
+
+- name: copy registr additional ca to manifests_output_dir
+  ansible.builtin.template:
+    src: "additional_ca_configmap.yaml.j2"
+    dest: "{{ manifests_output_dir.path }}/additional_ca_configmap.yaml"
+  vars:
+    additional_ca_raw_data  : "{{ image_registry.additional_ca.data }}"
+  when:
+    - image_registry.additional_ca.name is defined
+
+- include_tasks: update_gitops_config.yaml
+

@@ -1,0 +1,55 @@
+---
+- name: Setup SSO
+  block:
+    - include_vars: "{{ infra_out_clusters }}/{{ cluster_name }}/auth/kubeadmin-password"
+
+    - name: Login to cluster (obtain access token)
+      community.kubernetes.k8s_auth:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        username: kubeadmin
+        password: "{{ kubeadmin_pass }}"
+      register: k8s_auth_results
+
+    - name: Populate oauth template
+      template:
+        src: "./templates/oauth.yaml.j2"
+        dest: "{{ working_dir }}/oauth.yaml"
+      no_log: true
+
+    - name: Apply oauth
+      k8s:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        src: "{{ working_dir }}/oauth.yaml"
+        state: "{{ state }}"
+        api_version: v1
+
+    - name: Populate oauth secret template
+      template:
+        src: "./templates/oauth-secret.yaml.j2"
+        dest: "{{ working_dir }}/oauth-secret.yaml"
+      no_log: true
+
+    - name: Apply oauth secret
+      k8s:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        src: "{{ working_dir }}/oauth-secret.yaml"
+        state: "{{ state }}"
+        api_version: v1
+
+  # TODO API Permission for Microsoft Graph must be granted for the relevant application for this automation to work
+  #    - name: Create Redirect URI in Azure Portal
+  #      include_role:
+  #        name: ocp_azure_sso_setup
+  always:
+    - name: If login succeeded, try to log out (revoke access token)
+      when: k8s_auth_results.k8s_auth.api_key is defined
+      community.kubernetes.k8s_auth:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        state: absent
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"

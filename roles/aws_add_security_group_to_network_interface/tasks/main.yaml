@@ -1,0 +1,8 @@
+---
+- ec2_eni:
+    aws_access_key: "{{ aws.aws_access_key_id }}"
+    aws_secret_key: "{{ aws.aws_secret_access_key }}"
+    region: "{{ aws_region }}"
+    eni_id: "{{ network_interface_id }}"
+    security_groups:
+      - "{{ efa_security_group_id }}"

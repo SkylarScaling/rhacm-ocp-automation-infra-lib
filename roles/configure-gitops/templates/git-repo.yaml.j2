@@ -1,0 +1,40 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: argocd-cm
+  namespace: openshift-gitops
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  admin.enabled: 'true'
+  statusbadge.enabled: 'false'
+  resource.exclusions: |
+    - apiGroups:
+      - tekton.dev
+      clusters:
+      - '*'
+      kinds:
+      - TaskRun
+      - PipelineRun
+  ga.trackingid: ''
+  repositories: |
+    - passwordSecret:
+        key: password
+        name: {{ gitops_secret | default(default_gitops_secret) }}
+      type: git
+      url: https://<repo_url>/ocp-gitops-infra-config
+      usernameSecret:
+        key: username
+        name: {{ gitops_secret | default(default_gitops_secret) }}
+  ga.anonymizeusers: 'false'
+  help.chatUrl: ''
+  url: >-
+    https://argocd-cluster-server-openshift-gitops.apps.ocp-hub.<domain>
+  help.chatText: ''
+  kustomize.buildOptions: ''
+  resource.inclusions: ''
+  repository.credentials: ''
+  users.anonymous.enabled: 'false'
+  configManagementPlugins: ''
+  application.instanceLabelKey: ''

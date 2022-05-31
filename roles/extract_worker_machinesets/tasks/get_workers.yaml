@@ -1,0 +1,65 @@
+---
+- name: Set infra-config output path
+  set_fact:
+    infra_out_clusters: "../../../ocp-gitops-infra-config/clusters"
+
+- name: "Getting infra id for cluster {{ cluster_name }}"
+  block:
+    - include_vars: "{{ infra_out_clusters }}/{{ cluster_name }}/auth/kubeadmin-password"
+
+    - name: Login to cluster (obtain access token)
+      community.kubernetes.k8s_auth:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        username: kubeadmin
+        password: "{{ kubeadmin_pass }}"
+      register: k8s_auth_results
+
+    - name: get worker machinesets
+      k8s_info:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        api_version: machine.openshift.io/v1beta1
+        kind: MachineSet
+        label_selectors:
+        - hive.openshift.io/machine-pool=worker
+        namespace: "openshift-machine-api"
+      register: worker_machines
+
+    - name: Save machineset to file
+      ansible.builtin.copy:
+        content: "{{ work_machine | to_nice_yaml(indent=2) }}"
+        dest: "{{ manifests_output_dir.path }}/{{ work_machine.metadata.name }}.yaml"
+      loop: "{{ worker_machines.resources }}"
+      loop_control:
+        loop_var: work_machine
+
+    - name: update machinesets
+      include: add_labels.yaml
+      vars:
+        additional_labels: "{{ lookup('dict', installed_workers.additional_labels, wantlist=True) }}"
+      loop: "{{ worker_machines.resources }}"
+      loop_control:
+        loop_var: work_machine
+      when:
+      - installed_workers.additional_labels is defined
+
+    - name: update kustomizaiton
+      lineinfile:
+        insertafter: "resources:"
+        state: "{{ state }}"
+        dest: "{{ manifests_output_dir.path }}/kustomization.yaml"
+        line: "- {{ work_machine.metadata.name }}.yaml"
+      loop: "{{ worker_machines.resources }}"
+      loop_control:
+        loop_var: work_machine
+
+  always:
+    - name: If login succeeded, try to log out (revoke access token)
+      when: k8s_auth_results.k8s_auth.api_key is defined
+      community.kubernetes.k8s_auth:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        state: absent
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"

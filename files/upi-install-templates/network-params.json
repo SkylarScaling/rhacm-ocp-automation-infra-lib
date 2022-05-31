@@ -1,0 +1,30 @@
+[
+  {
+    "ParameterKey": "ClusterName",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "InfrastructureName",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "HostedZoneId",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "HostedZoneName",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "PublicSubnets",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "PrivateSubnets",
+    "ParameterValue": ""
+  },
+  {
+    "ParameterKey": "VpcId",
+    "ParameterValue": ""
+  }
+]

@@ -1,0 +1,170 @@
+---
+- name: Install Let's Encrypt Certs
+  block:
+    - include_vars: "../../../../ocp-gitops-infra-config/clusters/{{ cluster_name }}/auth/kubeadmin-password"
+
+    - name: Login to cluster (obtain access token)
+      community.kubernetes.k8s_auth:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        username: kubeadmin
+        password: "{{ kubeadmin_pass }}"
+      register: k8s_auth_results
+
+    - name: Populate cert-manager template
+      template:
+        src: "../files/cert-manager-crd.yaml.j2"
+        dest: "~/temp/cert-manager-crd.yaml"
+
+    - name: Install cert-manager from template CRD
+      k8s:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        state: present
+        src: "~/temp/cert-manager-crd.yaml"
+
+    - name: Create AWS creds secret
+      k8s:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: "{{cluster_name}}-aws-creds"
+            namespace: cert-manager
+          type: Opaque
+          data:
+            aws_access_key_id: "{{ aws.aws_access_key_id | b64encode }}"
+            aws_secret_access_key: "{{ aws.aws_secret_access_key | b64encode }}"
+
+    - name: Create IAM role with custom trust relationship
+      iam:
+        iam_type: role
+        name: letsencrypt-role
+        state: present
+        aws_access_key: "{{ aws.aws_access_key_id }}"
+        aws_secret_key: "{{ aws.aws_secret_access_key }}"
+        trust_policy:
+          Version: '2012-10-17'
+          Statement:
+            - Action: sts:AssumeRole
+              Effect: Allow
+              Principal:
+                Service: ec2.amazonaws.com
+
+    - name: Create Let's Encrypt policy
+      iam_policy:
+        iam_type: role
+        iam_name: letsencrypt-role
+        policy_name: letsencrypt-policy
+        state: present
+        policy_json: "{{ lookup( 'file', '../files/iam-policy.json') }}"
+        aws_access_key: "{{ aws.aws_access_key_id }}"
+        aws_secret_key: "{{ aws.aws_secret_access_key }}"
+
+    - name: Add a CAA record for letsencrypt
+      route53:
+        state: present
+        zone: "{{ install_config.base_domain }}"
+        record: "@.{{ install_config.base_domain }}"
+        type: CAA
+        value:
+          - 0 issue "letsencrypt.org"
+          - 0 issue "entrust.net"
+          - 0 iodef "mailto:pki-admin-manager@<domain>"
+        aws_access_key: "{{ aws.aws_access_key_id }}"
+        aws_secret_key: "{{ aws.aws_secret_access_key }}"
+
+    - name: "Get hosted zone id for {{ install_config.base_domain }}"
+      route53_zone:
+        zone: "{{ install_config.base_domain }}"
+      register: zone_info
+
+    - name: Set Hosted Zone ID fact
+      set_fact:
+        hosted_zone_id: "{{ zone_info.zone_id }}"
+
+    - name: Populate cluster-issuer template
+      template:
+        src: "../files/cluster-issuer.yaml.j2"
+        dest: "~/temp/cluster-issuer.yaml"
+
+    - name: Create ClusterIssuer
+      k8s:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        state: present
+        src: "~/temp/cluster-issuer.yaml"
+
+    - name: Populate apps certificate template
+      template:
+        src: "../files/apps-certificate.yaml.j2"
+        dest: "~/temp/apps-certificate.yaml"
+
+    - name: Create apps Certificate
+      k8s:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        state: present
+        src: "~/temp/apps-certificate.yaml"
+
+    - name: Patch ingress controller
+      k8s:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        state: present
+        definition:
+          api_version: v1
+          kind: IngressController
+          metadata:
+            name: default
+            namespace: openshift-ingress-operator
+          spec:
+            defaultCertificate:
+              name: "{{ certs.apps_certificate_secret_name}}"
+
+    - name: Populate api certificate template
+      template:
+        src: "../files/api-certificate.yaml.j2"
+        dest: "~/temp/api-certificate.yaml"
+
+    - name: Create api Certificate
+      k8s:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        state: present
+        src: "~/temp/api-certificate.yaml"
+
+    - name: Patch APIServer
+      k8s:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        state: present
+        definition:
+          api_version: config.openshift.io/v1
+          kind: APIServer
+          metadata:
+            name: cluster
+          spec:
+            servingCerts:
+              namedCertificates:
+              - names:
+                - "api.{{ certs.ocp_cluster_route }}"
+                servingCertificate:
+                  name: "{{ certs.api_certificate_secret_name }}"
+  always:
+    - name: If login succeeded, try to log out (revoke access token)
+      when: k8s_auth_results.k8s_auth.api_key is defined
+      community.kubernetes.k8s_auth:
+        host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        state: absent
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"

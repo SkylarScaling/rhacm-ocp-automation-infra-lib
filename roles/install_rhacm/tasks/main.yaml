@@ -1,0 +1,160 @@
+---
+- name: Install RHACM
+  block:
+    - include_vars: "{{ infra_out_clusters }}/{{ hub_cluster_name }}/auth/kubeadmin-password"
+
+    - name: Login to hub (obtain access token)
+      community.kubernetes.k8s_auth:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        username: kubeadmin
+        password: "{{ kubeadmin_pass }}"
+      register: k8s_auth_results
+
+    - name: "{{ 'Create' if state == 'present' else 'Remove' }} RHACM namespace"
+      k8s:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        api_version: v1
+        kind: Namespace
+        name: "{{ rhacm_namespace }}"
+        state: "{{ state }}"
+
+    - name: Populate pull secret template
+      template:
+        src: "./templates/pull-secret.yaml.j2"
+        dest: "{{ pull_secret_output }}"
+      no_log: true
+      when: state == 'present'
+
+    - name: Apply pull secret
+      k8s:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        src: "{{ pull_secret_output }}"
+        state: "{{ state }}"
+        namespace: "{{ rhacm_namespace }}"
+        api_version: v1
+      no_log: true
+      when: state == 'present'
+
+    - name: "{{ 'Create' if state == 'present' else 'Remove' }} OperatorGroup"
+      k8s:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        state: "{{ state }}"
+        namespace: "{{ rhacm_namespace }}"
+        definition:
+          apiVersion: operators.coreos.com/v1
+          kind: OperatorGroup
+          metadata:
+            name: rhacm-group
+          spec:
+            targetNamespaces:
+              - "{{ rhacm_namespace }}"
+
+    - name: "{{ 'Install' if state == 'present' else 'Remove' }} RHACM Operator"
+      k8s:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        state: "{{ state }}"
+        definition:
+          apiVersion: operators.coreos.com/v1alpha1
+          kind: Subscription
+          metadata:
+            name: acm-operator-subscription
+            namespace: "{{ rhacm_namespace }}"
+          spec:
+            sourceNamespace: openshift-marketplace
+            source: redhat-operators
+            channel: release-2.2
+            installPlanApproval: Automatic
+            name: advanced-cluster-management
+            starting_csv: advanced-cluster-management.v2.2.3
+
+    - name: Get InstallPlans
+      k8s_info:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        kind: InstallPlan
+        api_version: operators.coreos.com/v1alpha1
+        namespace: "{{ rhacm_namespace }}"
+      register: install_plan_names
+
+    - name: Set InstallPlan name
+      set_fact:
+        installplan_name: "{{ install_plan_names | json_query('metadata.name') }}"
+
+    - name: Wait for acm operator to install
+      k8s_info:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        kind: InstallPlan
+        api_version: operators.coreos.com/v1alpha1
+        namespace: "{{ rhacm_namespace }}"
+        name: "{{ installplan_name }}"
+      register: output_info
+      until: (output_info.resources | json_query('[0].status.phase')) == 'Complete'
+      delay: 2
+      retries: 20
+
+    - name: "{{ 'Create' if state == 'present' else 'Remove' }} MultiClusterHub Custom Resource"
+      k8s:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        state: "{{ state }}"
+        wait: true
+        definition:
+          apiVersion: operator.open-cluster-management.io/v1
+          kind: MultiClusterHub
+          metadata:
+            name: multiclusterhub
+            namespace: "{{ rhacm_namespace }}"
+          spec:
+            imagePullSecret: default-pull-secret
+            disableHubSelfManagement: false
+
+    - name: "Wait until MultiClusterHub Custom Resource is Running. Try once every 15 seconds over 15 minutes"
+      k8s_info:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        kind: MultiClusterHub
+        api_version: operator.open-cluster-management.io/v1
+        namespace: "{{ rhacm_namespace }}"
+      register: mch_output_info
+      until: (mch_output_info.resources | json_query('[0].status.phase')) == 'Running'
+      delay: 15
+      retries: 120
+
+    # This allows us to grant cluster-admin to the Subscription Controller so that it can apply objects to the
+    # namespaces specified in their manifests in git rather than only to the namespace where the Subscription object
+    # resides.
+    - name: "{{ 'Apply' if state == 'present' else 'Remove' }} Subscription Admin ClusterRoleBinding"
+      k8s:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+        src: "{{ playbook_dir }}/files/open-cluster-management_subscription-admin_clusterrolebinding.yaml"
+        namespace: "{{ rhacm_namespace }}"
+        state: "{{ state }}"
+
+    - name: Remove pull-secret.yaml
+      file:
+        path: "{{ pull_secret_output }}"
+        state: absent
+  always:
+    - name: If login succeeded, try to log out (revoke access token)
+      when: k8s_auth_results.k8s_auth.api_key is defined
+      community.kubernetes.k8s_auth:
+        host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+        validate_certs: no
+        state: absent
+        api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"

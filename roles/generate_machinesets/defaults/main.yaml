@@ -1,0 +1,8 @@
+---
+default_ms_type: "infra"
+volume_size: 120
+volume_type: 'gp2'
+default_instance_type: "m5.large"
+gpu_count: "0"
+memory_size: "8192"
+vcpu_count: "2"

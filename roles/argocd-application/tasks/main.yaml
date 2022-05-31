@@ -1,0 +1,4 @@
+---
+# Configure Cluster Creds
+- include_tasks: configure-creds.yaml
+- include_tasks: configure-argo-app.yaml

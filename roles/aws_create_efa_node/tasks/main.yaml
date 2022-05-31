@@ -1,0 +1,52 @@
+---
+- name: Get cluster ID
+  include_role:
+    name: aws_create_efa_security_group
+
+- set_fact:
+    efa_security_group_name: "{{ sg_id }}"
+
+- name: Apply Hugepages boottime config to cluster
+  k8s:
+    host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+    validate_certs: no
+    api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+    src: "{{ role_path }}/files/hugepages-tuned-boottime.yaml"
+    state: "{{ state }}"
+  when: state == 'present'
+
+- name: Apply Hugepages MCP to cluster
+  k8s:
+    host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+    validate_certs: no
+    api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+    src: "{{ role_path }}/files/hugepages-mcp.yaml"
+    state: "{{ state }}"
+  when: state == 'present'
+
+- name: create manifests output dir
+  ansible.builtin.file:
+    state: directory
+    path: "{{ manifests_output_path }}"
+  register: manifests_output_dir
+
+- name: print install_dir location for admin
+  ansible.builtin.debug:
+    msg: "The manifests directory location is {{ manifests_output_dir.path }}"
+
+- set_fact:
+    worker_name: "{{ cluster_id }}-ocp-worker-{{ aws_region }}-{{ 9999 |random }}"
+
+- name: Generate MachineSet for EFA Node
+  ansible.builtin.template:
+    src: "efa-machine-set.yaml.j2"
+    dest: "{{ manifests_output_dir.path }}/{{ worker_name }}.yaml"
+
+- name: Apply MachineSet to cluster
+  k8s:
+    host: "https://api.{{ cluster_name }}.{{ install_config.base_domain }}:6443"
+    validate_certs: no
+    api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+    src: "{{ manifests_output_dir.path }}/{{ worker_name }}.yaml"
+    state: "{{ state }}"
+  when: state == 'present'

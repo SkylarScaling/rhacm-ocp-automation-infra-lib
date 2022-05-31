@@ -1,0 +1,9 @@
+---
+- name: Download requisite Python modules
+  pip:
+    name: "{{ item }}"
+  loop:
+    - kubernetes
+    - openshift
+    - boto3
+...

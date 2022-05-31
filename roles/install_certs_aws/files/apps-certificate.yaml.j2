@@ -1,0 +1,24 @@
+apiVersion: cert-manager.io/v1alpha2
+kind: Certificate
+metadata:
+  name: "{{ certs.apps_certificate_name }}"
+  namespace: openshift-ingress
+spec:
+  secretName: "{{ certs.apps_certificate_secret_name }}"
+  duration: 2160h0m0s # 90d
+  renewBefore: 360h0m0s # 15d
+  organization:
+    - "{{ certs.org_name }}"
+  keySize: 2048
+  keyAlgorithm: rsa
+  keyEncoding: pkcs1
+  usages:
+    - server auth
+    - client auth
+  # At least one of a DNS Name, URI, or IP address is required.
+  dnsNames:
+    - 'apps.{{ certs.ocp_cluster_route }}'
+    - '*.apps.{{ certs.ocp_cluster_route }}'
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer

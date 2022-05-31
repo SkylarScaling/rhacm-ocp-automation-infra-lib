@@ -1,0 +1,41 @@
+apiVersion: integreatly.org/v1alpha1
+kind: GrafanaDataSource
+metadata:
+  name: federated-grafana
+  namespace: federated-prometheus
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    app: federated-grafana
+spec:
+  datasources:
+  - name: Prometheus
+    access: proxy
+    editable: true
+    isDefault: true
+    jsonData:
+      tlsSkipVerify: true
+      timeInterval: 5s
+    type: prometheus
+    url: http://federated-prometheus-direct:9090
+  - name: thanos
+    access: proxy
+    editable: true
+    jsonData:
+      tlsSkipVerify: true
+      timeInterval: 5s
+    type: prometheus
+    url: http://thanos-query.federated-prometheus.svc.cluster.local:10902
+  - name: loki
+    access: proxy
+    editable: true
+    jsonData:
+      tlsSkipVerify: true
+      timeInterval: 5s
+    type: loki
+    url: https://loki-loki.apps.{{ cluster_name }}.{{ install_config.base_domain }}
+    version: 1
+  name: federated-grafana.yaml
+
+
+ 

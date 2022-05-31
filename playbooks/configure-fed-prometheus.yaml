@@ -1,0 +1,18 @@
+---
+- name: Configure Federated-Prometheus
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  tags:
+    - configure fed-prometheus
+  vars:
+    manifests_output_path: "../../ocp-gitops-infra-config/clusters/{{ cluster_name }}"
+    output_path: "{{ manifests_output_path }}/federated-prometheus"
+  tasks:
+    - debug:
+        msg: "configure federated prometheus"
+    - name: Configure Fededrated Prometheus
+      include_role:
+        name: configure_fed_prometheus
+

@@ -1,0 +1,15 @@
+---
+- name: Get cluster ID
+  include_role:
+    name: get_managed_cluster_id
+
+- name: Add AmazonEC2ContainerRegistryReadOnly policy to node worker role
+  iam_role:
+    aws_access_key: "{{ aws.aws_access_key_id }}"
+    aws_secret_key: "{{ aws.aws_secret_access_key }}"
+    name: "{{ cluster_id }}-worker-role"
+    assume_role_policy_document: "{{ lookup('file','../files/policy.json') }}"
+    managed_policies:
+      - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+    state: present
+  register: policy

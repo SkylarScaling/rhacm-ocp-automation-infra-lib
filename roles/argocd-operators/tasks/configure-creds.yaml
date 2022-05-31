@@ -1,0 +1,39 @@
+---
+- name: "Configure Creds for cluster {{ cluster_name }}"
+  debug:
+    msg: "Configuring access for cluster {{ cluster_name }}"
+
+- name: Get cluster creds from RHACM
+  k8s_info:
+    host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+    validate_certs: no
+    api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+    api_version: v1
+    kind: Secret
+    name: "{{ cluster_name }}-cluster-secret"
+    namespace: "{{ cluster_name }}"
+  register: cluster_access_secret
+
+- name: "Create cluster argo secret"
+  k8s:
+    host: "https://api.{{ hub_cluster_name }}.{{ install_config.base_domain }}:6443"
+    validate_certs: no
+    api_key: "{{ k8s_auth_results.k8s_auth.api_key }}"
+    state: "{{ state }}"
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        annotations:
+          managed-by: argocd.argoproj.io
+        name: "{{ cluster_name }}-cluster"
+        namespace: openshift-gitops
+        labels:
+          argocd.argoproj.io/secret-type: cluster
+      data: "{{ cluster_access_secret.resources[0].data }}"
+      type: Opaque
+
+- name: "Create Server Var"
+  set_fact:
+    cluster_server_api: "{{ cluster_access_secret.resources[0].data.server | b64decode }}"
+

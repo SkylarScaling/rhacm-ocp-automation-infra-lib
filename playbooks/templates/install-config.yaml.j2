@@ -1,0 +1,97 @@
+apiVersion: v1
+baseDomain: {{ install_config.base_domain }}
+compute:
+- architecture: amd64
+  hyperthreading: Enabled
+  name: worker
+{% if install_config.workers is defined %}
+  platform:
+    aws:
+{% if install_config.workers.zones is defined %}
+      zones:
+{% for zone in install_config.workers.zones %}
+      - {{ zone }}
+{% endfor %}
+{% endif %}
+{% if install_config.workers.disk is defined %}
+      rootVolume:
+        iops: {{ install_config.workers.disk.iops }}
+        size: {{ install_config.workers.disk.size }}
+        type: {{ install_config.workers.disk.type }}
+{% endif %}
+{% if install_config.workers.instance_type is defined %}
+      type: {{ install_config.workers.instance_type }}
+{% endif %}
+  replicas: {{ install_config.workers.replicas }}
+{% else %}
+  platform:
+    replicas: 3
+{% endif %}
+controlPlane:
+  architecture: amd64
+  hyperthreading: Enabled
+  name: master
+{% if install_config.control_plane is defined %}
+  platform:
+    aws:
+{% if install_config.control_plane.zones is defined %}
+      zones:
+{% for zone in install_config.control_plane.zones %}
+        - {{ zone }}
+{% endfor -%}
+{% endif %}
+{%- if install_config.control_plane.disk is defined %}
+      rootVolume:
+        iops: {{ install_config.control_plane.disk.iops }}
+        size: {{ install_config.control_plane.disk.size }}
+        type: {{ install_config.control_plane.disk.type }}
+{% endif %}
+{% if install_config.control_plane.instance_type is defined %}
+      type: {{ install_config.control_plane.instance_type }}
+{% endif %}
+{% else %}
+  platform: {}
+{% endif %}
+  replicas: 3
+metadata:
+  creationTimestamp: null
+  name: {{ install_config.cluster_name }}
+networking:
+  clusterNetwork:
+{% if install_config.cluster_network is defined %}
+  - cidr: {{ install_config.cluster_network.cidr }}
+    hostPrefix: {{ install_config.cluster_network.prefix }}
+{% else %}
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+{% endif %}
+  machineNetwork:
+{% if install_config.machine_network is defined %}
+  - cidr: {{ install_config.machine_network.cidr }}
+{% else %}
+  - cidr: 10.0.0.0/16
+{% endif %}
+{% if install_config.network_type is defined %}
+  networkType: {{ install_config.network_type }}
+{% else %}
+  networkType: OpenShiftSDN
+{% endif %}
+  serviceNetwork:
+{% if install_config.service_network is defined %}
+  - {{ install_config.service_network.cidr }}
+{% else %}
+  - 172.30.0.0/16
+{% endif %}
+platform:
+  aws:
+    region: {{ install_config.aws_region }}
+{% if install_config.infra_tags is defined %}
+    userTags:
+      {{ install_config.infra_tags | to_nice_yaml | indent(6) }}
+{% endif %}
+publish: External
+pullSecret: '{{ install_config.pull_secret }}'
+{% if install_config.ssh_key is defined %}
+sshKey: |
+   {{ install_config.ssh_key }}
+{% endif %}

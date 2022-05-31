@@ -1,0 +1,13 @@
+---
+- name: Install Red Hat Advanced Cluster Management (RHACM)
+  gather_facts: false
+  hosts: localhost
+  vars:
+    rhacm_namespace: "open-cluster-management"
+    pull_secret_output: "{{ working_dir }}/pull-secret.yaml"
+    infra_out_clusters: "../../ocp-gitops-infra-config/clusters"
+  tasks:
+    - name: Install RHACM on hub
+      include_role:
+        name: install_rhacm
+...

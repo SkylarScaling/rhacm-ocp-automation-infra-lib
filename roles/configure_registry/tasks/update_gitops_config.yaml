@@ -1,0 +1,8 @@
+---
+- name: "Update Kustomizatoin with image registry config"
+  lineinfile:
+    insertafter: "resources:"
+    state: "{{ state }}"
+    dest: "{{ manifests_output_dir.path }}/kustomization.yaml" 
+    line: "- image_registry_config.yaml"
+

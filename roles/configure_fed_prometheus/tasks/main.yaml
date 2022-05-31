@@ -1,0 +1,61 @@
+---
+
+- name: create manifests output dir if it does not exist
+  ansible.builtin.file:
+    state: directory
+    path: "{{ output_path }}"
+
+
+- name: "copy prometheus scrape file into manifests_output_dir for the cluster"
+  ansible.builtin.template: 
+    src: "prometheus-scrape-configs-secret.yaml.j2"
+    dest: "{{ output_path }}/prometheus-scrape-configs-secret.yaml"
+
+
+- name: "copy grafana resource file into manifests_output_dir for the cluster"
+  ansible.builtin.template: 
+    src: "grafana.yaml.j2"
+    dest: "{{ output_path }}/grafana.yaml"
+
+- name: "Configure cluster kustomization file for {{ cluster_name }}"
+  copy:
+    src: "../files/kustomization.yaml"
+    dest: "{{ output_path }}/kustomization.yaml"
+    force: no
+
+
+- name: "Update Kustomization"
+  lineinfile:
+    insertafter: "resources:"
+    state: "{{ state }}"
+    dest: "{{ output_path }}/kustomization.yaml" 
+    line: "- prometheus-scrape-configs-secret.yaml"
+
+- name: "Update Kustomization"
+  lineinfile:
+    insertafter: "resources:"
+    state: "{{ state }}"
+    dest: "{{ output_path }}/kustomization.yaml" 
+    line: "- grafana.yaml"
+
+- name: "Add additional manifests to kustomization"
+  lineinfile:
+    insertafter: "bases:"
+    state: "{{ state }}"
+    dest: "{{ output_path }}/kustomization.yaml"
+    line: "- ../../../manifests/federated-prometheus"
+
+
+- name: "create top level kustomization file for {{ cluster_name }} if does not exists"
+  copy:
+    src: "../files/kustomization.yaml"
+    dest: "{{ manifests_output_path }}/kustomization.yaml"
+    force: no
+
+- name: "Update top level Kustomization file"
+  lineinfile:
+    insertafter: "resources:"
+    state: "{{ state }}"
+    dest: "{{ manifests_output_path }}/kustomization.yaml"
+    line: "- ./federated-prometheus"
+

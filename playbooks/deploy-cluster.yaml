@@ -1,0 +1,37 @@
+---
+################################################################################
+############ Pre Cluster Deploy Tasks
+################################################################################
+
+- import_playbook: "./cloud_providers/{{ cloud_provider }}/pre_cluster.yaml"
+  tags:
+    - pre_cluster
+    - pre_cluster_tasks
+  vars:
+    desired_state: present
+    ocp_cluster: '{{ ocp_cluster }}'
+    cloud_provider: '{{ ocp_cluster.platform }}'
+
+#################################################################################
+############ Deploy Cluster
+#################################################################################
+
+- import_playbook: "./cloud_providers/{{ cloud_provider }}/deploy_cluster.yaml"
+  tags:
+    - deploy_cluster
+  vars:
+    cloud_provider: '{{ ocp_cluster.platform }}'
+
+
+################################################################################
+########### Post Cluster Deploy Tasks
+################################################################################
+
+- import_playbook: "./cloud_providers/{{ cloud_provider }}/post_cluster.yaml"
+  tags:
+    - post_cluster
+    - post_cluster_tasks
+  vars:
+    cloud_provider: '{{ ocp_cluster.platform }}'
+
+

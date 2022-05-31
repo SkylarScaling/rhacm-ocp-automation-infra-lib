@@ -1,0 +1,26 @@
+---
+    - name: clear labels
+      set_fact:
+        additional_labels: 
+
+    - name: Set additional labels if present
+      set_fact:
+        additional_labels: "{{ lookup('dict', ms_definition.additional_labels, wantlist=True) }}"
+      when:
+      - ms_definition.additional_labels is defined
+
+    - name: Generate Machine Sets
+      include_role:
+        name: generate_machinesets
+      vars:
+        manifests_output_path: "../../ocp-gitops-infra-config/clusters/{{ cluster_name }}"
+        availability_zone: "{{ av_zone }}"
+        instance_type: "{{ ms_definition.instance_type }}"
+        provider_region: "{{ ms_definition.provider_region }}"
+        ms_type: "{{ ms_definition.role }}"
+        ms_name: "{{ ms_definition.name }}"
+        #no_taints: "{{ ms_definition.no_taints | default('false') }}" 
+        node_taints: "{{ ms_definition.taints | default([]) }}" 
+      loop_control:
+        loop_var: av_zone      
+      loop: "{{ ms_definition.availability_zones }}"

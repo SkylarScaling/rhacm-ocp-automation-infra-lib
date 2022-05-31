@@ -1,0 +1,12 @@
+---
+- name: Deploy SSO to target cluster
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    infra_out_clusters: "../../ocp-gitops-infra-config/clusters"
+  tasks:
+    - name: Setup SSO on cluster
+      include_role:
+        name: setup_sso
+...

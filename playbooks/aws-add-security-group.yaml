@@ -1,0 +1,12 @@
+---
+- name: Add EFA Security Group to Node
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  vars:
+    kubeconfig: "~/.kube/config"
+  tasks:
+    - name: Import Role
+      include_role:
+        name: aws_add_security_group_to_network_interface
